@@ -565,7 +565,15 @@ class Network(object):
             aux_links = []
             
         nodes = self.get_nodes_2D_pos()
-        node_coords = list(nodes.values())  # get only 2D coordinates
+        # build mapping from node index -> coordinates (keys may be strings)
+        node_coords = {}
+        for key, coord in nodes.items():
+            try:
+                idx = int(key)
+            except Exception:
+                continue
+            node_coords[idx] = coord
+        node_coords = {idx: coord for idx, coord in sorted(node_coords.items())}
 
         # draw edges before vertices
         for edge in links:
@@ -674,9 +682,10 @@ class Network(object):
             ax.plot(i, j, 'wo', ms=25, mec='k')
             ax.annotate(label, xy=(i, j), ha='center', va='center')
 
+        coord_list = list(node_coords.values())
         # https://stackoverflow.com/questions/13145368/find-the-maximum-value-in-a-list-of-tuples-in-python
-        xlim = np.ceil(max(node_coords, key=itemgetter(0))[0]) + 2
-        ylim = np.ceil(max(node_coords, key=itemgetter(1))[1]) + 2
+        xlim = np.ceil(max(coord_list, key=itemgetter(0))[0]) + 2
+        ylim = np.ceil(max(coord_list, key=itemgetter(1))[1]) + 2
         if self.name == 'nsf':
             xlim -= 1  # FIXME gambiarra, hehe. NSF needs redrawing
 

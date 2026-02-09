@@ -8,8 +8,7 @@ from argparse import Namespace
 import traceback
 import sys
 
-from rwa_wdm.BASE_NO_UPD import simulator as base_simulator
-from rwa_wdm.FB_NO_UPD import simulator as fb_simulator
+from rwa_wdm.BASE_Heuristic import simulator as base_simulator
 from rwa_wdm.util import validate_args
 
 # Ensure logging is configured so simulator info messages (QKP logs) are visible.
@@ -19,29 +18,24 @@ if not _logging.getLogger().handlers:
 
 # Default quick-run config — edit as needed
 DEFAULT_CONFIG = {
-    'topology': 'auxgraph_aux_d2',  # 'nsf', 'clara', 'janet', 'rnp', 'pdf', 'auxgraph_aux_d2'
+    'topology': 'COST239', 
     'channels': 4,  #according to the paper
     'r': 'dijkstra',
     'w': 'first-fit',
+    'y': 3,
     'rwa': None,
-    'load': 190,
-    'load_min': 30,
-    'load_step': 20,
-    'calls': 100000,
+    'load':150,
+    'load_min': 50,
+    'load_step': 10,
+    'calls': 10000,
     'result_dir': './results',
-    'num_sim': 1,
+    'num_sim': 2,
     'plot': True,
     'debug_adjacency':False,  #是否显示邻接矩阵
     'debug_dijkstra':False, #是否显示dijkstra调试信息
     'debug_lightpath':False, #是否显示lightpath调试信息
     'plot_topo':True,
-    'runner': 'fb_passive_qkp',  # 'base_no_upd' or 'fb_no_upd' 
-    'write_qkp_log': True,
-    'write_qkp_usage_log': True,
-     # or 'base_upd_rearrange' or 'base_upd_no_rearrange' or
-     #'fb_upd_rearrange' or 'pb_upd_rearrange' or 'pb_modified'
-     #or 'fb_passive_qkp'
-     #  rearrange的意思是允许在update里面重新安排波长，no_rearrange是不允许
+    'runner': 'base_no_upd',  # 'base_no_upd' or 'fb_no_upd' 
 }
 
 
@@ -79,26 +73,6 @@ def main(config: dict | None = None) -> int:
         validate_args(args)
         if args.runner == 'base_no_upd':
             simulator = base_simulator
-        elif args.runner == 'fb_no_upd':
-            simulator = fb_simulator
-        elif args.runner == 'base_upd_no_rearrange':
-            from rwa_wdm.BASE_UPD_NO_REARRANGE import simulator as base_updt_simulator
-            simulator = base_updt_simulator
-        elif args.runner == 'base_upd_rearrange':
-            from rwa_wdm.BASE_UPD_REARRANGE import simulator as base_updt_original_simulator
-            simulator = base_updt_original_simulator
-        elif args.runner == 'fb_upd_rearrange':
-            from rwa_wdm.FB_UPD_REARRANGE import simulator as fb_updt_simulator
-            simulator = fb_updt_simulator
-        elif args.runner == 'pb_upd_rearrange':
-            from rwa_wdm.PB_UPD_REARRANGE import simulator as pb_updt_simulator    
-            simulator = pb_updt_simulator
-        elif args.runner == 'pb_modified':
-            from rwa_wdm.PB_Modified import simulator as pb_Modified_simulator    
-            simulator = pb_Modified_simulator
-        elif args.runner == 'fb_passive_qkp':
-            from rwa_wdm.FB_passive_QKP import simulator as fb_passive_simulator    
-            simulator = fb_passive_simulator
         else:
             raise ValueError('Invalid runner specified: %s' % args.runner)
         simulator(args)

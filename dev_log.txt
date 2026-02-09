@@ -1,0 +1,8 @@
+1/18 ✔:
+Finished framework of BASE_env, the environment for the agent. Need to verify
+correctness of some functions calculating features in in. There is still a dummy
+implementation of PPO in BASE_PPO_TRAIN, need to be changed to actual working
+PPO implementation afterwards.
+
+TODO:
+Implement a PPO trainer and try the stuff out.

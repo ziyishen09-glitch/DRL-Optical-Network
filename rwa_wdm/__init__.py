@@ -4,8 +4,12 @@ optical networks.
 
 """
 import logging
+import numpy as _np
 
-from .BASE_NO_UPD import simulator
+if not hasattr(_np, 'float_'):
+    _np.float_ = _np.float64
+
+from .BASE_Heuristic import simulator
 
 # https://stackoverflow.com/questions/15727420/using-logging-in-multiple-modules/15729700#15729700
 logging.basicConfig(

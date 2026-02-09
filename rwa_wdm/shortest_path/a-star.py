@@ -41,23 +41,39 @@ def construct_path(dictionary, last_node):
         path = [last_node] + path
     return path
 
-# Création du graphe
-G = nx.Graph()
-G.add_nodes_from(range(1, 10))  # 9 nodes
-edges = [(1, 8), (8, 3), (8, 9), (3, 5), (3, 9), (5, 7), (5, 9), (7, 4), (7, 9), (4, 6), (4, 0), (6, 4), (6, 2), (2, 0), (0, 9), (0, 2), (9, 7), (9, 5), (9, 3), (9, 8)]
-G.add_edges_from(edges)
+if __name__ == "__main__":
+    G = nx.Graph()
+    G.add_nodes_from(range(1, 10))  # 9 nodes
+    edges = [
+        (1, 8), (8, 3), (8, 9), (3, 5), (3, 9), (5, 7), (5, 9), (7, 4),
+        (7, 9), (4, 6), (4, 0), (6, 4), (6, 2), (2, 0), (0, 9), (0, 2),
+        (9, 7), (9, 5), (9, 3), (9, 8)
+    ]
+    G.add_edges_from(edges)
 
-# Dessiner le graphe
-pos = nx.spring_layout(G)
-nx.draw(G, pos, with_labels=True, node_size=500, node_color="skyblue")
-for edge in edges:
-    plt.plot([pos[edge[0]][0], pos[edge[1]][0]], [pos[edge[0]][1], pos[edge[1]][1]], 'k-', alpha=0.3)
+    pos = nx.spring_layout(G)
+    nx.draw(G, pos, with_labels=True, node_size=500, node_color="skyblue")
+    for edge in edges:
+        plt.plot(
+            [pos[edge[0]][0], pos[edge[1]][0]],
+            [pos[edge[0]][1], pos[edge[1]][1]],
+            'k-',
+            alpha=0.3,
+        )
 
-# Utiliser l'algorithme A* pour trouver le chemin le plus court entre les nœuds 1 et 6
-shortest_path = shortest_path(G, 1, 6)
-print("Shortest Path:", shortest_path)
+    shortest_path_result = shortest_path(G, 1, 6)
+    print("Shortest Path:", shortest_path_result)
 
-# Dessiner le chemin le plus court
-nx.draw_networkx_edges(G, pos, edgelist=[(shortest_path[i], shortest_path[i+1]) for i in range(len(shortest_path)-1)], width=3, edge_color='r')
-plt.axis("off")
-plt.show()
+    nx.draw_networkx_edges(
+        G,
+        pos,
+        edgelist=[
+            (shortest_path_result[i], shortest_path_result[i + 1])
+            for i in range(len(shortest_path_result) - 1)
+        ],
+        width=3,
+        edge_color='r',
+    )
+
+    plt.axis("off")
+    plt.show()

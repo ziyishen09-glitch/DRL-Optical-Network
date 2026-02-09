@@ -16,6 +16,10 @@ def validate_args(args: Namespace) -> None:
 
 
     """
+    runner = getattr(args, 'runner', None)
+    if runner in {'train', 'eval'}:
+        return
+
     if args.rwa is None:
         if args.r is None and args.w is None:
             raise ValueError('The use of either --rwa flag or both -r and -w '

@@ -1,15 +1,14 @@
-from typing import Callable, Union
+from typing import Callable, List, Union
 
 from ..net import Lightpath, Network
-from .routing import dijkstra, yen
-from .wlassignment import vertex_coloring, first_fit, random_fit
+from ..shortest_path.k_shortest import find_k_shortest_paths
+from .routing import dijkstra
+from .wlassignment import first_fit
 from .ga import GeneticAlgorithm
 
 __all__ = (
-    'dijkstra_vertex_coloring',
     'dijkstra_first_fit',
-    'yen_vertex_coloring',
-    'yen_first_fit',
+    'ksp_first_fit',
     'genetic_algorithm',
 )
 
@@ -19,107 +18,70 @@ __all__ = (
 ga: Union[GeneticAlgorithm, None] = None
 
 
-def dijkstra_vertex_coloring(net: Network, k: int, debug: bool = False) -> Union[Lightpath, None]:
-    """Dijkstra and vertex coloring combination as RWA algorithm
+def _get_candidate_routes(net: Network, s: int, d: int, k: int | None, debug: bool) -> List[List[int]]:
+    num_paths = int(k) if k is not None else 1
+    if num_paths < 1:
+        num_paths = 1
+    if num_paths == 1:
+        route = dijkstra(net.a, s, d, debug=debug)
+        return [route] if route else []
+    try:
+        return find_k_shortest_paths(net.a, s, d, num_paths)
+    except ValueError:
+        return []
 
-    Args:
-        net: Network topology instance
-        k: number of alternate paths (ignored)
 
-    Returns:
-        Lightpath: if successful, returns both route and wavelength index as a
-            lightpath
-
-    """
-    route = dijkstra(net.a, net.s, net.d, debug=debug)
-    wavelength = vertex_coloring(net, Lightpath(route, None))
-    if wavelength is not None and wavelength < net.nchannels:
-        return Lightpath(route, wavelength)
-    return None
-
-#temporarily just modified this, because only this is used
-def dijkstra_first_fit(net: Network, s: int, d: int, k: int, debug: bool = False,
-                       aux_graph_mode: bool = False, enable_new_ff: bool = False, 
-                       ) -> Union[Lightpath, None]:
-    """Dijkstra and first-fit combination as RWA algorithm
-
-    Args:
-        net: Network topology instance
-        k: number of alternate paths (ignored)
-
-    Returns:
-        Lightpath: if successful, returns both route and wavelength index as a
-            lightpath
-
-    """
-    route = dijkstra(net.a, s, d, debug=debug)
-    # expand any auxiliary hops in the returned route to their stored
-    # physical paths before wavelength assignment
-    def _expand_aux_route(route):
-        """Expand auxiliary/virtual hops into their physical subpaths.
-
-        Always returns a 3-tuple: (route_nodes, contains_virtual_path, mapped_virtual_route)
-        where `mapped_virtual_route` is a list of physical subpaths (each a list
-        of nodes) corresponding to virtual hops found in the route.
-        """
-        contains_virtual_path = False
-        # normalized return even for trivial routes
-        if not route or len(route) < 2:
-            return route, contains_virtual_path, []
-
-        try:
-            mapping = net.virtual_adjacency2physical_path()
-        except Exception:
-            mapping = {}
-
-        expanded = []
-        mapped_virtual_route = []
-        for i in range(len(route) - 1):
-            u, v = route[i], route[i + 1]
-            key = (u, v)
-            if key in mapping:
-                contains_virtual_path = True
-                phys = mapping[key]
-                mapped_virtual_route.append(phys)
-                # append the physical path, but avoid duplicating the
-                # intermediate node when joining segments
-                if expanded and expanded[-1] == phys[0]:
-                    expanded.extend(phys[1:])
-                else:
-                    expanded.extend(phys)
-            else:
-                # no mapping: append the single hop (u) and let next
-                # iteration append v (or append both here for final)
-                if not expanded:
-                    expanded.append(u)
-                expanded.append(v)
-
-        # ensure route is a proper node sequence; if expansion failed,
-        # fall back to original route
-        if len(expanded) == 0:
-            return route, contains_virtual_path, mapped_virtual_route
-           
-        return expanded, contains_virtual_path, mapped_virtual_route
-    
-    # default values when not using auxiliary graph expansion
+def _expand_aux_route(net: Network, route: List[int]) -> tuple[List[int], bool, list[list[int]]]:
     contains_virtual_path = False
-    mapped_virtual_route = []
-    if aux_graph_mode:
-        route, contains_virtual_path, mapped_virtual_route = _expand_aux_route(route)
+    if not route or len(route) < 2:
+        return route, contains_virtual_path, []
 
-    # call first_fit. It returns Optional[List[int]] where the list may
-    # contain a single wavelength applied across the whole route or a
-    # per-link wavelength assignment. The caller controls the new behavior
-    # via enable_new_ff.
-    w_list = first_fit(net, route, contains_virtual_path, enable_new_ff=enable_new_ff)
+    try:
+        mapping = net.virtual_adjacency2physical_path()
+    except Exception:
+        mapping = {}
 
-    # Accept w_list even if some links were satisfied via QKP (negative sentinel values)
-    # A valid per-link assignment is one where every entry is either a real wavelength
-    # in [0, nchannels) or a negative sentinel (e.g. -10) meaning QKP-backed link.
-    if w_list is not None and len(w_list) > 0 and all(((w >= 0 and w < net.nchannels) or (isinstance(w, int) and w < 0)) for w in w_list):
-        # Choose a non-negative wavelength as the Lightpath base value if any; else fallback to 0
+    expanded: list[int] = []
+    mapped_virtual_route: list[list[int]] = []
+    for i in range(len(route) - 1):
+        u, v = route[i], route[i + 1]
+        key = (u, v)
+        if key in mapping:
+            contains_virtual_path = True
+            phys = mapping[key]
+            mapped_virtual_route.append(phys)
+            if expanded and expanded[-1] == phys[0]:
+                expanded.extend(phys[1:])
+            else:
+                expanded.extend(phys)
+        else:
+            if not expanded:
+                expanded.append(u)
+            expanded.append(v)
+
+    if not expanded:
+        return route, contains_virtual_path, mapped_virtual_route
+    return expanded, contains_virtual_path, mapped_virtual_route
+
+
+def _try_first_fit_routes(net: Network, routes: List[List[int]], aux_graph_mode: bool, enable_new_ff: bool) -> Union[Lightpath, None]:
+    for route in routes:
+        expanded_route = route
+        contains_virtual_path = False
+        mapped_virtual_route: list[list[int]] = []
+        if aux_graph_mode:
+            expanded_route, contains_virtual_path, mapped_virtual_route = _expand_aux_route(net, route)
+
+        if not expanded_route:
+            continue
+
+        w_list = first_fit(net, expanded_route, contains_virtual_path, enable_new_ff=enable_new_ff)
+        if not w_list:
+            continue
+        if not all(((w >= 0 and w < net.nchannels) or (isinstance(w, int) and w < 0)) for w in w_list):
+            continue
         base_w = next((w for w in w_list if isinstance(w, int) and w >= 0), 0)
-        lp = Lightpath(route, base_w)
+        lp = Lightpath(expanded_route, base_w)
         try:
             lp.w_list = list(w_list)
         except Exception:
@@ -128,101 +90,23 @@ def dijkstra_first_fit(net: Network, s: int, d: int, k: int, debug: bool = False
             lp.contains_virtual = contains_virtual_path
             lp.mapped_virtual_route = mapped_virtual_route
         except Exception:
-            # backwards compatibility: ignore if properties not supported
             pass
-        # NOTE: QKP recording must be performed only when the simulator
-        # actually allocates the lightpath (and knows the allocated holding
-        # time). The simulator sets `lightpath.holding_time` and calls
-        # `net.t.add_lightpath(lp)` later; therefore QKP bookkeeping is
-        # deferred to the simulator code so the deposited key amount matches
-        # the actual allocated time.
         return lp
     return None
 
 
-def dijkstra_random_fit(net: Network, k: int, debug: bool = False) -> Union[Lightpath, None]:
-    """Dijkstra and random-fit combination as RWA algorithm
-
-    Args:
-        net: Network topology instance
-        k: number of alternate paths (ignored)
-
-    Returns:
-        Lightpath: if successful, returns both route and wavelength index as a
-            lightpath
-
-    """
-    route = dijkstra(net.a, net.s, net.d, debug=debug)
-    wavelength = random_fit(net, route)
-    if wavelength is not None and wavelength < net.nchannels:
-        return Lightpath(route, wavelength)
-    return None
+def dijkstra_first_fit(net: Network, s: int, d: int, k: int, debug: bool = False,
+                       aux_graph_mode: bool = False, enable_new_ff: bool = False,
+                       ) -> Union[Lightpath, None]:
+    routes = _get_candidate_routes(net, s, d, 1, debug)
+    return _try_first_fit_routes(net, routes, aux_graph_mode, enable_new_ff)
 
 
-def yen_vertex_coloring(net: Network, k: int) -> Union[Lightpath, None]:
-    """Yen and vertex coloring combination as RWA algorithm
-
-    Args:
-        net: Network topology instance
-        k: number of alternate paths (ignored)
-
-    Returns:
-        Lightpath: if successful, returns both route and wavelength index as a
-            lightpath
-
-    """
-    routes = yen(net.a, net.s, net.d, k)
-    for route in routes:
-        wavelength = vertex_coloring(net, Lightpath(route, None))
-        if wavelength is not None and wavelength < net.nchannels:
-            return Lightpath(route, wavelength)
-    return None
-
-
-def yen_first_fit(net: Network, k: int, enable_new_ff: bool = False) -> Union[Lightpath, None]:
-    """Yen and first-fit combination as RWA algorithm
-
-    Args:
-        net: Network topology instance
-        k: number of alternate paths (ignored)
-
-    Returns:
-        Lightpath: if successful, returns both route and wavelength index as a
-            lightpath
-
-    """
-    routes = yen(net.a, net.s, net.d, k)
-    for route in routes:
-        w_list = first_fit(net, route, enable_new_ff=enable_new_ff)
-        if w_list is not None and len(w_list) > 0 and all(((w >= 0 and w < net.nchannels) or (isinstance(w, int) and w < 0)) for w in w_list):
-            base_w = next((w for w in w_list if isinstance(w, int) and w >= 0), 0)
-            lp = Lightpath(route, base_w)
-            try:
-                lp.w_list = list(w_list)
-            except Exception:
-                pass
-            return lp
-    return None
-
-
-def yen_random_fit(net: Network, k: int) -> Union[Lightpath, None]:
-    """Yen and random-fit combination as RWA algorithm
-
-    Args:
-        net: Network topology instance
-        k: number of alternate paths (ignored)
-
-    Returns:
-        Lightpath: if successful, returns both route and wavelength index as a
-            lightpath
-
-    """
-    routes = yen(net.a, net.s, net.d, k)
-    for route in routes:
-        wavelength = random_fit(net, route)
-        if wavelength is not None and wavelength < net.nchannels:
-            return Lightpath(route, wavelength)
-    return None
+def ksp_first_fit(net: Network, s: int, d: int, k: int, debug: bool = False,
+                  aux_graph_mode: bool = False, enable_new_ff: bool = False,
+                  ) -> Union[Lightpath, None]:
+    routes = _get_candidate_routes(net, s, d, k, debug)
+    return _try_first_fit_routes(net, routes, aux_graph_mode, enable_new_ff)
 
 
 def genetic_algorithm_callback(net: Network, k: int) -> Union[Lightpath, None]:

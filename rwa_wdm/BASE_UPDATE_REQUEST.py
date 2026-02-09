@@ -17,7 +17,8 @@ import heapq
 
 # normal package-relative import (works when running as a module)
 from .io import write_bp_to_disk, write_it_to_disk, write_SP_A_to_disk, write_SP_R_to_disk, plot_bp, plot_sp_a, plot_sp_r
-from .net import Network, Lightpath
+from .net import Network
+from .net.factory import get_net_instance_from_args
 
 
 __all__ = (
@@ -27,46 +28,6 @@ __all__ = (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def get_net_instance_from_args(topname: str, numch: int) -> Network:
-    """Instantiates a Network object from CLI string identifiers
-
-    This is useful because rwa_wdm supports multiple network topology
-    implementations, so this function acts like the instance is created
-    directly.
-
-    Args:
-        topname: short identifier for the network topology
-        numch: number of wavelength channels per network link
-
-    Returns:
-        Network: network topology instance
-
-    Raises:
-        ValueError: if `topname` is not a valid network identifier
-
-    """
-    if topname == 'nsf':
-        from .net import NationalScienceFoundation
-        return NationalScienceFoundation(numch)
-    elif topname == 'clara':
-        from .net import CooperacionLatinoAmericana
-        return CooperacionLatinoAmericana(numch)
-    elif topname == 'janet':
-        from .net import JointAcademicNetwork
-        return JointAcademicNetwork(numch)
-    elif topname == 'rnp':
-        from .net import RedeNacionalPesquisa
-        return RedeNacionalPesquisa(numch)
-    elif topname == 'pdf':
-        from .net import MyTopology
-        return MyTopology(numch)
-    elif topname == 'auxgraph_demo_net':
-        from .net import auxgraph_demo_net
-        return auxgraph_demo_net(numch)
-    else:
-        raise ValueError('No network named "%s"' % topname)
 
 
 def get_rwa_algorithm_from_args(r_alg: str, wa_alg: str, rwa_alg: str,
@@ -134,6 +95,87 @@ def get_rwa_algorithm_from_args(r_alg: str, wa_alg: str, rwa_alg: str,
         raise ValueError('RWA algorithm not specified')
 
 
+def RWA_for_update(net: "Network", s: int, d: int,
+                   debug: bool = False,
+                   aux_graph_mode: bool = False):
+    """Route via Dijkstra and apply single-try first-fit for updates.
+
+    Policy:
+    - Run Dijkstra to get a route (optionally expand virtual edges).
+    - On the first link choose the first available wavelength (lowest index).
+    - Verify the same wavelength is available on all subsequent links.
+    - If any link fails, do NOT try other wavelengths; return None.
+
+    Returns a Lightpath or None on failure.
+    """
+    try:
+        from .rwa.routing.dijkstra import dijkstra as _dijkstra
+        from .net import Lightpath as _Lightpath
+    except Exception:
+        _dijkstra = None
+        _Lightpath = None
+
+    route = []
+    if _dijkstra is not None:
+        route = _dijkstra(net.a, s, d, debug=debug)
+
+    def _expand_aux_route(rt):
+        contains_virtual_path = False
+        if not rt or len(rt) < 2:
+            return rt, contains_virtual_path
+        mapping = {}
+        try:
+            mapping = net.virtual_adjacency2physical_path()
+        except Exception:
+            mapping = {}
+        expanded = []
+        for i_idx in range(len(rt) - 1):
+            u, v = rt[i_idx], rt[i_idx + 1]
+            key = (u, v)
+            if key in mapping:
+                contains_virtual_path = True
+                phys = mapping[key]
+                if expanded and expanded[-1] == phys[0]:
+                    expanded.extend(phys[1:])
+                else:
+                    expanded.extend(phys)
+            else:
+                if not expanded:
+                    expanded.append(u)
+                expanded.append(v)
+        return (expanded if expanded else rt), contains_virtual_path
+
+    contains_virtual_path = False
+    if aux_graph_mode:
+        route, contains_virtual_path = _expand_aux_route(route)
+
+    if not route or len(route) < 2 or _Lightpath is None:
+        return None
+
+    # single-try first-fit: pick first available on first link only
+    i0, j0 = route[0], route[1]
+    chosen_w = None
+    for w in range(net.nchannels):
+        if net.n[i0][j0][w]:
+            chosen_w = w
+            break
+    if chosen_w is None:
+        return None
+
+    # verify this wavelength along the entire path
+    for idx in range(len(route) - 1):
+        i, j = route[idx], route[idx + 1]
+        if not net.n[i][j][chosen_w]:
+            return None
+
+    lp = _Lightpath(route, chosen_w)
+    try:
+        lp.contains_virtual = contains_virtual_path
+    except Exception:
+        pass
+    return lp
+
+
 def simulator(args: Namespace) -> None:
     """Main RWA simulation routine over WDM networks
 
@@ -150,6 +192,7 @@ def simulator(args: Namespace) -> None:
     load_step = getattr(args, 'load_step', 1)
     debug_counter = 5 #dijkstra debug counter
     aux_graph_mode = False
+    enable_new_ff = True
     # print header for pretty stdout console logging
     print('Load:   ', end='')
     for i in range(load_min, args.load + 1, load_step):
@@ -191,43 +234,47 @@ def simulator(args: Namespace) -> None:
             except Exception as _e:
                 print('[debug] failed to print adjacency matrix:', _e)
 
-        if getattr(args, 'plot_topo', False): #get attr默认false
-            net.plot_topology() #plot net topology (optional)
+        # Optional topology plot only
+        if getattr(args, 'plot_topo', False): # get attr默认false
+            net.plot_topology()
 
-            rwa = get_rwa_algorithm_from_args(
-                args.r, args.w, args.rwa,
-                getattr(args, 'pop_size', None),
-                getattr(args, 'num_gen', None),
-                getattr(args, 'cross_rate', None),
-                getattr(args, 'mut_rate', None)
-            )
+        # RWA algorithm must be resolved regardless of plotting
+        rwa = get_rwa_algorithm_from_args(
+            args.r, args.w, args.rwa,
+            getattr(args, 'pop_size', None),
+            getattr(args, 'num_gen', None),
+            getattr(args, 'cross_rate', None),
+            getattr(args, 'mut_rate', None)
+        )
 
-            blocklist = []
-            blocks_per_erlang = []
-            # lists to store SPA and SPR per load (as proportions in [0,1])
-            sp_a_per_erlang = []
-            sp_r_per_erlang = []
-            # resource usage numerator per load (link*wavelength*time)
-            resource_used_per_erlang = []
-            # resource utilization proportion per load
-            resource_util_per_erlang = []
+        blocklist = []
+        blocks_per_erlang = []
+        # lists to store SPA and SPR per load (as proportions in [0,1])
+        sp_a_per_erlang = []
+        sp_r_per_erlang = []
+        # resource usage numerator per load (link*wavelength*time)
+        resource_used_per_erlang = []
+        # resource utilization proportion per load
+        resource_util_per_erlang = []
 
             # iterate through Erlangs (loads)
-            for load in range(load_min, args.load + 1, load_step):
+        for load in range(load_min, args.load + 1, load_step):
                 blocks = 0
                 SPANUM = args.calls
                 SPRNUM = 0
                 # track per-request counting metadata
                 updates_meta: dict[int, dict] = {}
                 call_sd: dict[int, tuple[int, int]] = {}
-                # store original successful allocation (route, wavelength)
-                call_alloc: dict[int, tuple[list, int]] = {}
-                # store planned number of updates for each call (computed at request time)
+                # planned updates per call (computed at request time,
+                # scheduled only if the original request is allocated)
                 call_updates: dict[int, int] = {}
 
                 # unified event queue contains both arrivals and updates
-                # entries: (event_time, event_type, call_id, is_last_update)
-                event_queue: list[tuple[int, str, int, bool]] = []
+                # explicit priority to break ties at same time:
+                #   priority = 0 for 'request' (arrivals)
+                #   priority = 1 for 'update'
+                # entries: (event_time, priority, event_type, call_id, is_last_update)
+                event_queue: list[tuple[int, int, str, int, bool]] = []
                 current_time = 0
                 next_call_id = 0
                 n_nodes = net.a.shape[0]
@@ -241,7 +288,9 @@ def simulator(args: Namespace) -> None:
                             raise RuntimeError(msg)
                         else:
                             logger.warning(msg)
-                    heapq.heappush(event_queue, (ev_time, ev_type, ev_call, ev_last))
+                    # priority: ensure requests are popped before updates at the same ev_time
+                    prio = 0 if ev_type == 'request' else 1
+                    heapq.heappush(event_queue, (ev_time, prio, ev_type, ev_call, ev_last))
 
                 # per-load counters for update diagnostics
                 upd_scheduled = 0
@@ -257,11 +306,26 @@ def simulator(args: Namespace) -> None:
 
                 # helper to sample interarrival given load
                 def sample_interarrival(load_val):
+                    # New (preferred): discrete-time Poisson arrivals → geometric interarrival (support starts at 1)
+                    # per-slot arrival rate: lambda_arr = load / E[S] where E[S]=250 slots (geometric service mean)
+                    
+                    # lambda_arr = float(load_val) / 250.0
+                    # # # convert to geometric success probability p = 1 - exp(-lambda_arr)
+                    # # # guard for extreme values to avoid p<=0 or p>=1 due to float issues
+                    # p = 1.0 - np.exp(-lambda_arr)
+                    # if p <= 0.0:
+                    #     p = 1e-12
+                    # elif p >= 1.0:
+                    #     p = 1.0 - 1e-12
+                    # return int(np.random.geometric(p))  # returns 1,2,3,... (slots until next arrival)
+
+                    # Old (kept for comparison): continuous exponential + ceil to slots
                     lam = float(load_val) / 250.0
                     if lam > 1.0:
                         lam = 1.0
-                    return int(np.ceil(np.random.exponential(scale=1.0 / lam)))
-                    # return int(np.ceil(np.random.exponential(scale=1.0 / lam)))
+                    return int(np.round(np.random.exponential(scale=1.0 / lam)+0.2))
+                    #Alternative rounding variant considered previously:
+                    # return int(np.round(np.random.exponential(scale=1.0 / lam) + 0.15))
 
                 # schedule first original arrival if any
                 if args.calls > 0:
@@ -271,10 +335,9 @@ def simulator(args: Namespace) -> None:
 
                 # process events in strict time order
                 while event_queue:
-                    event_time, event_type, call, is_last_update = heapq.heappop(event_queue)
+                    event_time, _prio, event_type, call, is_last_update = heapq.heappop(event_queue)
                     until_next = event_time - current_time
-                    current_time = event_time
-                    
+
                     # Advance time to this event BEFORE processing it:
                     # release channels whose timers expire and decrement holding times.
                     # This ensures resources that become free at t=event_time are
@@ -301,6 +364,8 @@ def simulator(args: Namespace) -> None:
 
                             net.t[j][i][w] = net.t[i][j][w]
                             net.n[j][i][w] = net.n[i][j][w]
+
+                    current_time = event_time
                     # optional debug trace for events
                     if getattr(args, 'debug_updates', False):
                         print(f"[event] t={current_time} type={event_type} call={call} last={is_last_update}")
@@ -337,13 +402,13 @@ def simulator(args: Namespace) -> None:
                         s_init, d_init = int(a), int(b)
                         call_sd[call] = (s_init, d_init)
 
-                        # compute planned updates but DO NOT schedule them yet;
-                        # only schedule updates if the original request is
-                        # allocated successfully (otherwise updates must not exist)
+                        # compute planned number of updates but DO NOT push
+                        # them onto the event heap yet. If the original
+                        # request gets blocked we must discard these plans
+                        # so blocked calls do not produce update events.
                         p = 0.004 #leave rate
                         #according to leave rate, the actual holding time of a request
                         data_layer_holding_time = np.random.geometric(p)
-
                         update_nums = int(np.floor(data_layer_holding_time / 100))
                         call_updates[call] = update_nums
 
@@ -354,76 +419,38 @@ def simulator(args: Namespace) -> None:
                             next_call_id += 1
 
                     # determine endpoints for this event
+                    skip_rwa = False  # if True, skip RWA (e.g., missing (s,d) on update)
                     if is_update:
                         try:
                             s, d = call_sd[call]
                         except Exception:
+                            # Missing (s,d): discard this update (do NOT inject random endpoints)
                             upd_missing_callsd += 1
-                            a, b = np.random.choice(n_nodes, size=2, replace=False)
-                            s, d = int(a), int(b)
+                            skip_rwa = True
+                            s, d = None, None
                     else:
                         s, d = call_sd.get(call, (None, None))
                         if s is None:
                             a, b = np.random.choice(n_nodes, size=2, replace=False)
                             s, d = int(a), int(b)
 
-                    # For updates, try to allocate using the original
-                    # route and wavelength recorded at the original request.
-                    if is_update:
-                        alloc_info = call_alloc.get(call)
-                        if alloc_info is None:
-                            # no original allocation recorded -> update fails
-                            lightpath = None
-                        else:
-                            route, w_alloc = alloc_info
-                            # check availability across the original route. w_alloc
-                            # may be an int (legacy) or a list[int] (per-link).
-                            ok = True
-                            if isinstance(w_alloc, list):
-                                for idx in range(len(route) - 1):
-                                    i_check, j_check = route[idx], route[idx + 1]
-                                    try:
-                                        w_chk = w_alloc[idx]
-                                    except Exception:
-                                        ok = False
-                                        break
-                                    if not net.n[i_check][j_check][w_chk]:
-                                        ok = False
-                                        break
-                                if ok:
-                                    lightpath = Lightpath(list(route), w_alloc[0])
-                                    try:
-                                        lightpath.w_list = list(w_alloc)
-                                    except Exception:
-                                        pass
-                                else:
-                                    lightpath = None
-                            else:
-                                for idx in range(len(route) - 1):
-                                    i_check, j_check = route[idx], route[idx + 1]
-                                    if not net.n[i_check][j_check][w_alloc]:
-                                        ok = False
-                                        break
-                                if ok:
-                                    lightpath = Lightpath(list(route), w_alloc)
-                                else:
-                                    lightpath = None
-                    else:
-                        debug_dij = getattr(args, 'debug_dijkstra', False)
+                    debug_dij = getattr(args, 'debug_dijkstra', False)
+                    if not skip_rwa:
+                        # if is_update:
+                        #     # Updates: use fixed RWA for updates
+                        #     lightpath = RWA_for_update(net, s, d, debug=debug_dij, aux_graph_mode=aux_graph_mode)
+                        # else:
+                        # Original requests: keep using configured RWA (e.g., dijkstra_first_fit)
                         if debug_dij:
                             debug_counter -= 1
                             if debug_counter < 0:
-                                lightpath = rwa(net, s, d, args.y, debug=False, aux_graph_mode=aux_graph_mode)
+                                lightpath = rwa(net, s, d, args.y, debug=False, aux_graph_mode=aux_graph_mode, enable_new_ff=enable_new_ff)
                             else:
-                                lightpath = rwa(net, s, d, args.y, debug=debug_dij, aux_graph_mode=aux_graph_mode)
+                                lightpath = rwa(net, s, d, args.y, debug=debug_dij, aux_graph_mode=aux_graph_mode, enable_new_ff=enable_new_ff)
                         else:
-                            lightpath = rwa(net, s, d, args.y, debug=debug_dij, aux_graph_mode=aux_graph_mode)
-
-                    # RWA routines and update-path logic already ensure
-                    # the returned lightpath's wavelength is available across
-                    # (moved to first fit)
-                    # the whole route. The redundant per-link availability
-                    # check was removed to avoid duplicate work.
+                            lightpath = rwa(net, s, d, args.y, debug=debug_dij, aux_graph_mode=aux_graph_mode, enable_new_ff=enable_new_ff)
+                    else:
+                        lightpath = None
 
                     # Determine satisfaction & allocate resources if lightpath exists
                     is_satisfied = False
@@ -437,6 +464,12 @@ def simulator(args: Namespace) -> None:
                                 call_updates.pop(call, None)
                             except Exception:
                                 pass
+                            # also free stored endpoints for cleanliness
+                            try:
+                                if isinstance(call_sd, dict):
+                                    call_sd.pop(call, None)
+                            except Exception:
+                                pass
                         else:
                             # update failed
                             is_satisfied = False
@@ -446,16 +479,20 @@ def simulator(args: Namespace) -> None:
                         lightpath.holding_time = holding_time
                         net.t.add_lightpath(lightpath)
                         # accumulate resource usage: holding_time * number_of_links
+                        # lightpath.links may be a generator — materialize once for reuse
                         links_list = list(lightpath.links)
                         n_links = len(links_list) if links_list is not None else 0
                         if n_links <= 0:
-                            n_links = 1
+                            n_links = 1  # defensive fallback
                         resource_used_time += holding_time * n_links
+                        # support per-link wavelength assignments (w_list) or
+                        # fall back to single-wavelength stored in lightpath.w
                         if hasattr(lightpath, 'w_list') and lightpath.w_list:
                             for idx, (i, j) in enumerate(links_list):
                                 try:
                                     w = lightpath.w_list[idx]
                                 except Exception:
+                                    # fallback to first wavelength if indexing fails
                                     w = getattr(lightpath, 'w', None)
                                     if w is None:
                                         continue
@@ -472,15 +509,9 @@ def simulator(args: Namespace) -> None:
                                 net.t[i][j][w] = holding_time
                                 net.n[j][i][w] = net.n[i][j][w]
                                 net.t[j][i][w] = net.t[i][j][w]
-                        # record original allocation for this call (only for request allocations)
+                        # if this was an original request allocation, schedule
+                        # any planned data-layer updates computed earlier
                         if not is_update:
-                            try:
-                                # store per-call allocation as (route, w_list) when present
-                                call_alloc[call] = (list(lightpath.r), getattr(lightpath, 'w_list', getattr(lightpath, 'w', None)))
-                            except Exception:
-                                # defensive: if lightpath doesn't expose route, skip storing
-                                pass
-                            # schedule data-layer updates only if allocation succeeded
                             planned = call_updates.get(call, 0)
                             if planned > 0:
                                 for k in range(planned):
@@ -502,7 +533,6 @@ def simulator(args: Namespace) -> None:
 
                     # SP counters and diagnostics for update events
                     if is_update:
-                        upd_popped += 1
                         # check if call_sd is present (works for dict or list)
                         s_d = None
                         if isinstance(call_sd, dict):
@@ -530,34 +560,29 @@ def simulator(args: Namespace) -> None:
                             # free stored endpoints for this call — no further updates will reference it
                             if isinstance(call_sd, dict):
                                 call_sd.pop(call, None)
-                            # free stored original allocation info as well
-                            try:
-                                call_alloc.pop(call, None)
-                            except Exception:
-                                pass
                             else:
                                 if 0 <= call < len(call_sd):
                                     call_sd[call] = None
 
-                    
+                    # (time already advanced before processing the event)
 
+                # end of event_queue while
                 blocklist.append(blocks)
                 blocks_per_erlang.append(100.0 * blocks / args.calls)
-                # detailed update stats collection removed (debug-only)
-
                 # also collect resource usage numerator per load
                 resource_used_per_erlang.append(resource_used_time)
 
                 # Compute SPA and SPR as proportions. Use only non-blocked
-                # requests in the denominator (blocked requests cannot
-                # generate updates).
-                effective_calls = max(0, args.calls - blocks)
+                # requests in the denominator (blocked requests cannot generate updates).
+                # Exclude blocked originals from denominators
+                effective_calls_SPA = args.calls
+                effective_calls_SPR = args.calls - blocks
                 try:
-                    SPA = float(SPANUM) / float(effective_calls) if effective_calls > 0 else 0.0
+                    SPA = float(SPANUM) / float(effective_calls_SPA) if effective_calls_SPA > 0 else 0.0
                 except Exception:
                     SPA = 0.0
                 try:
-                    SPR = float(SPRNUM) / float(effective_calls) if effective_calls > 0 else 0.0
+                    SPR = float(SPRNUM) / float(effective_calls_SPR) if effective_calls_SPR > 0 else 0.0
                 except Exception:
                     SPR = 0.0
                 sp_a_per_erlang.append(SPA)
@@ -566,6 +591,7 @@ def simulator(args: Namespace) -> None:
                 # compute resource utilization (numerator / denominator)
                 # denominator = number_of_links * channels * total_simulation_time
                 try:
+                    # compute unique undirected link count from net.get_edges()
                     
                     n_links_total = 10
                     n_channels = getattr(net, 'nchannels', getattr(net, 'num_ch', None))
@@ -577,10 +603,9 @@ def simulator(args: Namespace) -> None:
                         rutil = 0.0
                 except Exception:
                     rutil = 0.0
-
-                # collect resource utilization per load
                 resource_util_per_erlang.append(rutil)
 
+        # end of per-load loop; finalize this simulation
         sim_time = default_timer() - sim_time
         time_per_simulation.append(sim_time)
 
@@ -605,59 +630,56 @@ def simulator(args: Namespace) -> None:
             args.rwa if args.rwa is not None else '%s_%s' % (args.r, args.w),
             int(args.channels))
 
-    write_bp_to_disk(args.result_dir, fbase + '.bp', blocks_per_erlang)
-
-    # write SPA and SPR (proportions) to disk
-    write_SP_A_to_disk(args.result_dir, fbase + '.spa', sp_a_per_erlang)
-    write_SP_R_to_disk(args.result_dir, fbase + '.spr', sp_r_per_erlang)
-    # write utilization proportions to disk
-    try:
-        from rwa_wdm.io import write_rutil_to_disk
-        write_rutil_to_disk(args.result_dir, fbase + '.rutil', resource_util_per_erlang)
-    except Exception:
-        logger.exception('Failed to write resource utilization (.rutil)')
-
-    # (transient per-load upd_stats removed to reduce I/O); detailed update stats
-    # are still written as a CSV later using update_stats_per_erlang
-
-    write_it_to_disk(args.result_dir, fbase + '.it', time_per_simulation)
-
-    # cleanup dij logger handler if it was configured
-    if dij_logger_handler is not None:
-        dij_log = __import__('logging').getLogger('rwa_dijkstra_debug')
-        dij_log.removeHandler(dij_logger_handler)
-        dij_logger_handler.close()
-
-    if args.plot:
-        load_min = getattr(args, 'load_min', 1)
-        load_step = getattr(args, 'load_step', 1)
-        plot_bp(args.result_dir, load_min=load_min, load_max=args.load, load_step=load_step)
-        # also plot SPA and SPR when plotting is requested
+        # Write one line per simulation (append mode)
+        write_bp_to_disk(args.result_dir, fbase + '.bp', blocks_per_erlang)
+        write_SP_A_to_disk(args.result_dir, fbase + '.spa', sp_a_per_erlang)
+        write_SP_R_to_disk(args.result_dir, fbase + '.spr', sp_r_per_erlang)
         try:
-            plot_sp_a(args.result_dir, load_min=load_min, load_max=args.load, load_step=load_step)
+            from rwa_wdm.io import write_rutil_to_disk
+            write_rutil_to_disk(args.result_dir, fbase + '.rutil', resource_util_per_erlang)
         except Exception:
-            logger.exception('Failed to plot SP_A')
-        try:
-            plot_sp_r(args.result_dir, load_min=load_min, load_max=args.load, load_step=load_step)
-        except Exception:
-            logger.exception('Failed to plot SP_R')
-        try:
-            from rwa_wdm.io import plot_rutil
-            plot_rutil(args.result_dir, load_min=load_min, load_max=args.load, load_step=load_step)
-        except Exception:
-            logger.exception('Failed to plot resource utilization')
-    # write update stats to a simple CSV-style file for debugging SPR
-        # write resource usage numerators per load to a separate file
-        try:
-            os.makedirs(args.result_dir, exist_ok=True)
-            res_file = os.path.join(args.result_dir, fbase + '.res')
-            with open(res_file, 'w', encoding='utf-8') as rf:
-                rf.write('load,resource_used_time\n')
-                load_val = load_min
-                for value in resource_used_per_erlang:
-                    rf.write(f"{load_val},{int(value)}\n")
-                    load_val += load_step
-            logger.info('Wrote resource usage to %s', res_file)
-        except Exception:
-            logger.exception('Failed to write resource usage (.res)')
+            logger.exception('Failed to write resource utilization (.rutil)')
+        # Write only the current simulation time on its own line
+        write_it_to_disk(args.result_dir, fbase + '.it', [sim_time])
+
+        # per-simulation writes already performed above
+
+        # cleanup dij logger handler if it was configured
+        if dij_logger_handler is not None:
+            dij_log = __import__('logging').getLogger('rwa_dijkstra_debug')
+            dij_log.removeHandler(dij_logger_handler)
+            dij_logger_handler.close()
+
+        if args.plot:
+            load_min = getattr(args, 'load_min', 1)
+            load_step = getattr(args, 'load_step', 1)
+            plot_bp(args.result_dir, load_min=load_min, load_max=args.load, load_step=load_step)
+            # also plot SPA and SPR when plotting is requested
+            try:
+                plot_sp_a(args.result_dir, load_min=load_min, load_max=args.load, load_step=load_step)
+            except Exception:
+                logger.exception('Failed to plot SP_A')
+            try:
+                plot_sp_r(args.result_dir, load_min=load_min, load_max=args.load, load_step=load_step)
+            except Exception:
+                logger.exception('Failed to plot SP_R')
+            try:
+                from rwa_wdm.io import plot_rutil
+                plot_rutil(args.result_dir, load_min=load_min, load_max=args.load, load_step=load_step)
+            except Exception:
+                logger.exception('Failed to plot resource utilization')
+        # write update stats to a simple CSV-style file for debugging SPR
+            # write resource usage numerators per load to a separate file
+            try:
+                os.makedirs(args.result_dir, exist_ok=True)
+                res_file = os.path.join(args.result_dir, fbase + '.res')
+                with open(res_file, 'w', encoding='utf-8') as rf:
+                    rf.write('load,resource_used_time\n')
+                    load_val = load_min
+                    for value in resource_used_per_erlang:
+                        rf.write(f"{load_val},{int(value)}\n")
+                        load_val += load_step
+                logger.info('Wrote resource usage to %s', res_file)
+            except Exception:
+                logger.exception('Failed to write resource usage (.res)')
 

@@ -47,7 +47,7 @@ net.add_argument('-c', type=int, default=8, dest='channels',
 # TODO [ -r <algorithms> -w <algorithm> ] [ --rwa <algorithm> ]
 # https://stackoverflow.com/questions/17909294/python-argparse-mutual-exclusive-group
 rwa.add_argument('-r', metavar='<algorithm>',
-                 choices=['dijkstra', 'yen'],
+                 choices=['dijkstra', 'yen', 'ksp'],
                  help='routing algorithm')
 rwa.add_argument('-w', metavar='<algorithm>',
                  choices=['vertex-coloring', 'first-fit', 'random-fit'],
@@ -57,7 +57,7 @@ rwa.add_argument('--rwa', metavar='<algorithm>',
                  help='routing *and* wavelength assigment algorithm')
 rwa.add_argument('-y', metavar='<yen-alt-paths>', type=int,
                  default=2, choices=range(2, 5),
-                 help='number of routing alternate paths (Yen\'s)')
+                 help='number of routing alternate paths (Yen\'s or KSP)')
 
 # simulation options
 sim.add_argument('-l', type=int, default=30, dest='load',
@@ -74,6 +74,8 @@ sim.add_argument('-s', type=int, default=1, dest='num_sim',
                  help='number of times to run the simulation')
 sim.add_argument('-p', default=False, dest='plot', action='store_true',
                  help='plot blocking probability graph after simulation?')
+sim.add_argument('--debug-queue', dest='debug_queue', action='store_true',
+                 help='print each event popped from the queue')
 
 # genetic algorithm options
 ga.add_argument('--pop-size', type=int, default=25,

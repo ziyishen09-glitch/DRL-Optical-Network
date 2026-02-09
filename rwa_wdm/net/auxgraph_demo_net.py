@@ -40,15 +40,15 @@ class auxgraph_demo_net(Network):
         # node index -> (x, y) coordinates laid out to match the visual diagram
         # Top row y = +0.6, bottom row y = -0.6; left x = -1.0, right x = +1.0
         return OrderedDict([
-            ('0', (-1.0,  0)),   # top-left
-            ('1', (-0.33, 0.5)),   # top-left-center
-            ('2', (0.2,  0.5)),   # top-right-center
-            ('3', (1.36,   0.5)),   # top-right
+            ('0', (-1.0,  0.2)),   # top-left
+            ('1', (-0.33, 0.7)),   # top-left-center
+            ('2', (0.2,  0.7)),   # top-right-center
+            ('3', (1.36,   0.7)),   # top-right
 
-            ('4', (-0.33, -0.5)),   # bottom-left
-            ('5', (0.83,-0.5)),   # bottom-left-center
-            ('6', (1.36, -0.5)),   # bottom-right-center
-            ('7', (2.0,  0)),   # bottom-right
+            ('4', (-0.33, -0.3)),   # bottom-left
+            ('5', (0.83,-0.3)),   # bottom-left-center
+            ('6', (1.36, -0.3)),   # bottom-right-center
+            ('7', (2.0,  0.2)),   # bottom-right
         ])
 
 
