@@ -331,7 +331,3 @@ def simulator(args: Namespace) -> None:
             )
         except Exception:
             logger.exception('Failed to plot blocking probabilities')
-
-
-
-

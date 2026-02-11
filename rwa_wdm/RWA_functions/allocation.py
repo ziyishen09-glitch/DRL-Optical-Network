@@ -36,17 +36,18 @@ def allocate_lightpath(
     if not links_list:
         links_list = []
 
-    for idx, (i, j) in enumerate(links_list):
-        try:
-            w = candidate.w_list[idx]
-        except Exception:
-            w = getattr(candidate, 'w', None)
-        if w is None:
+    w_list = getattr(candidate, 'w_list', None) or []
+    holding_time_value = candidate.holding_time
+    for idx, w in enumerate(w_list):
+        if idx >= len(links_list):
+            break
+        if w is None or not isinstance(w, int) or w < 0 or w >= getattr(net, 'nchannels', 0):
             continue
+        i, j = links_list[idx]
         net.n[i][j][w] = 0
-        net.t[i][j][w] = candidate.holding_time
+        net.t[i][j][w] = holding_time_value
         net.n[j][i][w] = net.n[i][j][w]
-        net.t[j][i][w] = net.t[j][i][w]
+        net.t[j][i][w] = net.t[i][j][w]
 
     return {
         'lightpath': candidate,

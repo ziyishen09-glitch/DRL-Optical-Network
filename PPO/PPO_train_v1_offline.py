@@ -165,9 +165,9 @@ def build_episode_length_scheduler(args: Namespace) -> Optional[EpisodeLengthSch
 def parse_args() -> Namespace:
     parser = argparse.ArgumentParser(description="Offline PPO training for the RWA environment")
     parser.add_argument("--topology", default="COST239", help="Topology identifier for the network")
-    parser.add_argument("--channels", type=int, default=4, help="Number of wavelengths per link")
-    parser.add_argument("--episodes", type=int, default=30000, help="Total episodes to run; overrides num_sim * loads")
-    parser.add_argument("--episode-length", type=int, default=20, help="Requests per episode before reset")
+    parser.add_argument("--channels", type=int, default=16, help="Number of wavelengths per link")
+    parser.add_argument("--episodes", type=int, default=5000, help="Total episodes to run; overrides num_sim * loads")
+    parser.add_argument("--episode-length", type=int, default=200, help="Requests per episode before reset")
     parser.add_argument(
         "--episode-length-max",
         type=int,
@@ -222,7 +222,7 @@ def parse_args() -> Namespace:
         help="Let the training runner control allocations and traffic advancement manually",
     )
     parser.add_argument("--total-timesteps", type=int, default=None, help="Timesteps for training; inferred from episodes when omitted")
-    parser.add_argument("--save-freq", type=int, default=30000, help="Checkpoint frequency")
+    parser.add_argument("--save-freq", type=int, default=50000, help="Checkpoint frequency")
     parser.add_argument("--log-dir", default="tmp/rwa_ppo", help="Directory for logs and checkpoints")
     parser.add_argument("--seed", type=int, default=0, help="Random seed for reproducibility")
     parser.add_argument("--learning-rate", type=float, default=3e-4, help="Learning rate for PPO")
@@ -230,7 +230,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--plot-reward", dest="plot_reward", action="store_true", help="Save reward plot after training")
     parser.add_argument("--no-plot-reward", dest="plot_reward", action="store_false", help="Skip saving the reward plot")
     parser.set_defaults(plot_reward=True, episode_length_randomize=False, auto_manage_resources=True)
-    parser.add_argument("--plot-every", type=int, default=100, help="Episodes per block when plotting rewards")
+    parser.add_argument("--plot-every", type=int, default=10, help="Episodes per block when plotting rewards")
     parser.add_argument("--batch-size", type=int, default=256, help="PPO minibatch size")
     parser.add_argument("--k", type=int, default=3, help="Candidate path count requested by the env")
     return parser.parse_args()

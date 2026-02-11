@@ -142,7 +142,12 @@ def simulator(args: Namespace) -> None:
             blocks = 0
             current_time = 0.0
             nodes = list(range(net.a.shape[0]))
-            event_queue = generate_request_queue(args.calls, load, nodes)
+            event_queue = generate_request_queue(
+                args.calls,
+                load,
+                nodes,
+                holding_mean=getattr(args, 'holding_time', 10),
+            )
             resource_used_time = 0.0
 
             while event_queue:
@@ -151,8 +156,7 @@ def simulator(args: Namespace) -> None:
                 if getattr(args, 'debug_queue', False):
                     print(f"[event pop] t={event_time:.4f} call={event['id']}")
                 until_next = event_time - current_time
-
-                advance_traffic_matrix(net, until_next)
+                #advance_traffic_matrix(net, until_next)
 
                 current_time = event_time
 
@@ -190,21 +194,23 @@ def simulator(args: Namespace) -> None:
                 if lightpath is None:
                     blocks += 1
                 else:
-                    holding_time = 10
-                    lightpath.holding_time = holding_time
+                    holding_time_value = float(event.get('holding_time', getattr(args, 'holding_time', 10)))
+                    holding_time_value = max(1.0, holding_time_value)
+                    holding_time_int = max(1, int(round(holding_time_value)))
+                    lightpath.holding_time = holding_time_int
                     # use the full node sequence so wavelength indexing stays valid
                     route = list(lightpath.r)
                     allocation = rwa_allocate_lightpath(
                         net,
                         route,
-                        holding_time=holding_time,
+                        holding_time=holding_time_int,
                         enable_new_ff=enable_new_ff,
                     )
                     if allocation is None:
                         blocks += 1
                         continue
                     links = allocation.get('links') or []
-                    resource_used_time += holding_time * max(1, len(links))
+                    resource_used_time += holding_time_value * max(1, len(links))
 
             blocklist.append(blocks)
             blocks_per_erlang.append(100.0 * blocks / args.calls if args.calls > 0 else 0.0)

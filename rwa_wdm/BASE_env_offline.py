@@ -161,15 +161,15 @@ class BASEEnv(Env):
                             self._pending_reward = 1.0
                         else:
                             blocked_request = True
-                            self._pending_reward = -5.0
+                            self._pending_reward = -1.0
                     else:
                         self._pending_reward = 0.0
                 else:
                     blocked_request = True
-                    self._pending_reward = -5.0
+                    self._pending_reward = -1.0
             else:
                 blocked_request = True
-                self._pending_reward = -5.0
+                self._pending_reward = -1.0
 
         self._last_selected_route = selected_route
         self._last_selected_index = selected_index

@@ -19,22 +19,22 @@ if not _logging.getLogger().handlers:
 # Default quick-run config — edit as needed
 DEFAULT_CONFIG = {
     'topology': 'COST239', 
-    'channels': 4,  #according to the paper
-    'r': 'dijkstra',
+    'channels': 16,  #according to the paper
+    'r': 'ksp',
     'w': 'first-fit',
     'y': 3,
     'rwa': None,
     'load':150,
-    'load_min': 50,
+    'load_min': 150,
     'load_step': 10,
-    'calls': 10000,
+    'calls':400,
     'result_dir': './results',
-    'num_sim': 2,
-    'plot': True,
+    'num_sim': 5,
+    'plot': False,
     'debug_adjacency':False,  #是否显示邻接矩阵
     'debug_dijkstra':False, #是否显示dijkstra调试信息
     'debug_lightpath':False, #是否显示lightpath调试信息
-    'plot_topo':True,
+    'plot_topo':False,
     'runner': 'base_no_upd',  # 'base_no_upd' or 'fb_no_upd' 
 }
 

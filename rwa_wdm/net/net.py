@@ -310,7 +310,7 @@ class Network(object):
             else:
                 i, j = edge[0], edge[1]
             for w in range(self._num_channels):
-                availability = np.random.choice((0, 1))
+                availability = 1
                 self._n[i][j][w] = availability
                 self._n[j][i][w] = self._n[i][j][w] #for symmetry
 
@@ -348,10 +348,7 @@ class Network(object):
                 # random integer remaining time in [0, 10] so initial
                 # allocations are spread over the first 10 slots. When the
                 # wavelength is free, time is 0.
-                if self._n[i][j][w]:
-                    random_time = np.random.randint(1, 11)
-                else:
-                    random_time = 0
+                random_time = 0
                 self._t[i][j][w] = random_time
                 self._t[j][i][w] = self._t[i][j][w]
 

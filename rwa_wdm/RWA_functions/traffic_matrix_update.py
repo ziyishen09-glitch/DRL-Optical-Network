@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Iterable
 
 from ..net import Network
+
+
+logger = logging.getLogger(__name__)
 
 
 def advance_traffic_matrix(net: Network, elapsed_time: float) -> None:
@@ -20,6 +24,7 @@ def advance_traffic_matrix(net: Network, elapsed_time: float) -> None:
         if remaining > elapsed_time:
             lightpath.holding_time = remaining - elapsed_time
         else:
+            logger.info('lightpath %s expired after %.3f seconds', lightpath.id, elapsed_time)
             net.t.remove_lightpath_by_id(lightpath.id)
 
     for edge in net.get_edges():

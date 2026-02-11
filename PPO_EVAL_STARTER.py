@@ -17,7 +17,7 @@ __all__ = ["main"]
 
 DEFAULT_CONFIG = {
     "topology": "COST239",
-    "channels": 4,
+    "channels": 16,
     "load": 150,
     "load_min": 150,
     "load_step": 10,
@@ -29,10 +29,10 @@ DEFAULT_CONFIG = {
     "debug_dijkstra": False,
     "debug_lightpath": False,
     "k": 3,
-    "model_path": "tmp/rwa_ppo/rwa_model_600000_steps.zip",
+    "model_path": "tmp/rwa_ppo/rwa_model_1000000_steps.zip",
     "log_dir": "tmp/rwa_ppo",
     "seed": None,
-    "deterministic": True,
+    "deterministic": False,
     "holding_time": 10,
     "env_mode": "offline",
     "external_control": True,

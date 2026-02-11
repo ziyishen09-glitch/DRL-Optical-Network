@@ -29,6 +29,7 @@ def generate_request_queue(
         src, dst = rng.sample(nodes, 2)
         inter_arrival = sample_interarrival(load, rng)
         current_time += inter_arrival
+        # holding_time = sample_holding_time(holding_mean, rng)
         holding_time = 10
         queue.append({
             'id': idx,
@@ -43,7 +44,18 @@ def generate_request_queue(
 
 def sample_interarrival(load: float, rng: Optional[random.Random] = None) -> float:
     """Sample Erlang-style interarrival times (λ = load / 10)."""
-    lam = float(load) / 10.0
+    lam = float(load) / 1.5
     generator = rng or random
     interarrival = generator.expovariate(lam)
     return float(max(0.0, interarrival))
+
+
+def sample_holding_time(holding_mean: float, rng: Optional[random.Random] = None) -> float:
+    """Sample holding times using an exponential distribution around the provided mean."""
+    generator = rng or random
+    mean_value = max(0.0, float(holding_mean))
+    if mean_value <= 0.0:
+        return 1.0
+    rate = 1.0 / mean_value
+    holding_time = generator.expovariate(rate)
+    return float(max(1.0, holding_time))
