@@ -1,4 +1,4 @@
-"""Implements network topologies
+﻿"""Implements network topologies
 
 """
 
@@ -194,7 +194,7 @@ class WavelengthAvailabilityMatrix(np.ndarray):
     """Boolean 3D matrix that stores network wavelength availability info
 
     The wavelength availability matrix is a tridimensional, binary matrix that
-    stores information on whether a particular wavelength λ is available on an
+    stores information on whether a particular wavelength 位 is available on an
     optical link (i, j). This class is a subclass of a NumPy array.
 
     Args:
@@ -283,7 +283,7 @@ class Network(object):
 
     Hols network properties such as adjacency, wavelength-availability and
     traffic graph matrices, fixed source and destination nodes for all
-    connections, number of λ channels per link
+    connections, number of 位 channels per link
 
     Args:
         num_channels: number of wavelength channels per link

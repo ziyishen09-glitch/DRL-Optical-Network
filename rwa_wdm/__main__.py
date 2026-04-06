@@ -1,4 +1,4 @@
-# PYTHON_ARGCOMPLETE_OK
+﻿# PYTHON_ARGCOMPLETE_OK
 """Enable the execution of "rwa_wdm" package as a command line program with the
 ``-m`` switch. For example:
 
@@ -41,7 +41,7 @@ net.add_argument('-t', default='nsf', dest='topology',
 net.add_argument('-c', type=int, default=8, dest='channels',
                  choices=[2 ** (i + 1) for i in range(8)],  # max: 256
                  metavar='<channels>',
-                 help='number of λ per link')
+                 help='number of 位 per link')
 net.add_argument('--failure-link', metavar='<src,dst>',
                  dest='failure_link',
                  type=parse_link_argument,
@@ -106,7 +106,7 @@ if __name__ == '__main__':
         logger.error('Bad input: %s', e)
     else:
         logger.info('Simulating %s connection requests over %s topology with '
-                    '%d λ per link using %s as RWA algorithm' %
+                    '%d 位 per link using %s as RWA algorithm' %
                     (args.calls, args.topology, args.channels,
                      args.rwa if args.rwa is not None else
                      '%s + %s combination' % (args.r, args.w)))

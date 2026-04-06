@@ -1,4 +1,4 @@
-"""Shared helpers for instantiating network topologies."""
+﻿"""Shared helpers for instantiating network topologies."""
 
 from .net import Network
 

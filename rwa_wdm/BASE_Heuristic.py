@@ -1,4 +1,4 @@
-"""RWA simulator main function
+﻿"""RWA simulator main function
 
 """
 
@@ -191,13 +191,13 @@ def simulator(args: Namespace) -> None:
             resource_used_time = 0.0
             pending_requests: list[dict] = []
             while event_queue or pending_requests:
-                # 1. 推进到下一个有意义的时隙
+                # 1. 鎺ㄨ繘鍒颁笅涓€涓湁鎰忎箟鐨勬椂闅?
                 if not pending_requests and event_queue:
-                    # 池子空了，直接跳到下一个请求到达的时隙
+                    # 姹犲瓙绌轰簡锛岀洿鎺ヨ烦鍒颁笅涓€涓姹傚埌杈剧殑鏃堕殭
                     next_time = float(event_queue[0]['arrival_time'])
                     next_slot = int(math.ceil(next_time))
                 else:
-                    # 池子还有请求，按步长推进 1 个时隙
+                    # 姹犲瓙杩樻湁璇锋眰锛屾寜姝ラ暱鎺ㄨ繘 1 涓椂闅?
                     next_slot = current_slot + 1
                 
                 delta_slots = next_slot - current_slot
@@ -205,7 +205,7 @@ def simulator(args: Namespace) -> None:
                     advance_traffic_matrix(net, float(delta_slots))
                 current_slot = next_slot
 
-                # 2. 把当前时隙到达的任务加入待分配池
+                # 2. 鎶婂綋鍓嶆椂闅欏埌杈剧殑浠诲姟鍔犲叆寰呭垎閰嶆睜
                 while event_queue:
                     next_event = event_queue[0]
                     arrival_time = float(next_event['arrival_time'])
@@ -225,7 +225,7 @@ def simulator(args: Namespace) -> None:
                     else:
                         break
 
-                # 3. 对池子里所有请求在这个时隙尝试分配
+                # 3. 瀵规睜瀛愰噷鎵€鏈夎姹傚湪杩欎釜鏃堕殭灏濊瘯鍒嗛厤
                 updated_pending: list[dict] = []
                 for event in pending_requests:
                     prefix = 'Blocks: '
@@ -274,7 +274,7 @@ def simulator(args: Namespace) -> None:
                         updated_pending.append(event)
                         continue
 
-                    # 分配成功逻辑
+                    # 鍒嗛厤鎴愬姛閫昏緫
                     holding_time_value = float(event.get('holding_time', 10))
                     holding_time_int = max(1, int(round(holding_time_value)))
                     lightpath.holding_time = holding_time_int
@@ -285,15 +285,15 @@ def simulator(args: Namespace) -> None:
                         updated_pending.append(event)
                         continue
                     
-                    # 真正分配成功，增加资源统计
+                    # 鐪熸鍒嗛厤鎴愬姛锛屽鍔犺祫婧愮粺璁?
                     links = allocation.get('links') or []
                     resource_used_time += holding_time_value * max(1, len(links))
 
-                # 4. 检查池子里的请求是否过期
+                # 4. 妫€鏌ユ睜瀛愰噷鐨勮姹傛槸鍚﹁繃鏈?
                 final_pending: list[dict] = []
                 for event in updated_pending:
                     if current_slot >= event['deadline_slot']:
-                        blocks += 1 # 正式阻塞
+                        blocks += 1 # 姝ｅ紡闃诲
                         if event.get('_route_contains_failure_link'):
                             failure_link_blocked_requests += 1
                     else:

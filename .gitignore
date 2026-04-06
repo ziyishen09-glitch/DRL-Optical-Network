@@ -9,7 +9,10 @@ __pycache__/
 pip-wheel-metadata/
 
 # virtualenv
+<<<<<<< HEAD
 .venv/
+=======
+>>>>>>> 309a74d505d1aa87510b44c04f3ed4692b388b18
 venv_main/
 venv/
 ENV/

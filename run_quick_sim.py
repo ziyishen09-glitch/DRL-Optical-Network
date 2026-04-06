@@ -1,4 +1,4 @@
-"""Small helper script to run the simulator with an embedded config.
+﻿"""Small helper script to run the simulator with an embedded config.
 
 This script builds an argparse.Namespace containing the parameters the
 simulator expects, validates them using `validate_args`, then calls
@@ -15,7 +15,7 @@ import logging as _logging
 if not _logging.getLogger().handlers:
     _logging.basicConfig(level=_logging.INFO, format='[%(levelname)s] %(message)s')
 
-# Default quick-run config — edit as needed
+# Default quick-run config 鈥?edit as needed
 DEFAULT_CONFIG = {
     'topology': 'COST239_Failure',
     'channels': 8,  # changed from 4 to 8
@@ -30,9 +30,9 @@ DEFAULT_CONFIG = {
     'result_dir': './results',
     'num_sim': 10,
     'plot': False,
-    'debug_adjacency': False,  # 是否显示邻接矩阵
-    'debug_dijkstra': False,  # 是否显示 dijkstra 调试信息
-    'debug_lightpath': False,  # 是否显示 lightpath 调试信息
+    'debug_adjacency': False,  # 鏄惁鏄剧ず閭绘帴鐭╅樀
+    'debug_dijkstra': False,  # 鏄惁鏄剧ず dijkstra 璋冭瘯淇℃伅
+    'debug_lightpath': False,  # 鏄惁鏄剧ず lightpath 璋冭瘯淇℃伅
     'plot_topo': True,
     'failure_link': (1, 3),
     'failure_lookup_path': 'results_ppo/failure_lookup_COST239_1-3_k3.json',

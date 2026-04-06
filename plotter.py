@@ -1,4 +1,4 @@
-
+﻿
 """Small helper to plot simulation results on demand.
 
 Usage examples:

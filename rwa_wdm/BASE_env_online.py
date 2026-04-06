@@ -1,4 +1,4 @@
-# inherit from gym.Env to create a custom environment
+﻿# inherit from gym.Env to create a custom environment
 from __future__ import annotations
 from collections import deque
 from typing import Callable, Deque, List, Optional, Sequence, Tuple
@@ -55,8 +55,8 @@ class BASEEnv(Env):
         )
         self._num_load_levels = max(1, len(self._load_levels))
         self.observation_space = spaces.Dict({
-            # 全局交通矩阵与全局波长可用矩阵暂时不启用
-            # mask项是区分有效路径与占位的（有时可能找不到K条路径）
+            # 鍏ㄥ眬浜ら€氱煩闃典笌鍏ㄥ眬娉㈤暱鍙敤鐭╅樀鏆傛椂涓嶅惎鐢?
+            # mask椤规槸鍖哄垎鏈夋晥璺緞涓庡崰浣嶇殑锛堟湁鏃跺彲鑳芥壘涓嶅埌K鏉¤矾寰勶級
             # traffic and availability matrices commented out to keep observations lightweight
             # 'traffic_matrix': spaces.Box(low=0, high=np.inf, shape=(self._num_nodes, self._num_nodes), dtype=np.float32),
             # 'wavelength_availability': spaces.Box(low=0, high=1, shape=(self._num_links, self._num_wavelengths), dtype=np.int8),
@@ -71,7 +71,7 @@ class BASEEnv(Env):
             'traffic_load': spaces.MultiBinary(self._num_load_levels),
         })
         self._null_action_index = self._max_candidates * self._max_time_slots
-        self.action_space = spaces.Discrete(self._null_action_index + 1) # +1 就是啓用null action
+        self.action_space = spaces.Discrete(self._null_action_index + 1) # +1 灏辨槸鍟撶敤null action
         self.network_instance: Optional[Network] = network_instance
         self._candidate_features = self._empty_candidate_features()
         self._candidate_paths: List[Sequence[int]] = []
@@ -83,8 +83,8 @@ class BASEEnv(Env):
         self._reward_success = 1.0
         self._reward_failure = -1.0
         self._reward_null = -1
-        self._request_source: int = 0 # 记录当前请求的源节点（内部变量）
-        self._request_destination: int = 0 # 记录当前请求的目的节点（内部变量）
+        self._request_source: int = 0 # 璁板綍褰撳墠璇锋眰鐨勬簮鑺傜偣锛堝唴閮ㄥ彉閲忥級
+        self._request_destination: int = 0 # 璁板綍褰撳墠璇锋眰鐨勭洰鐨勮妭鐐癸紙鍐呴儴鍙橀噺锛?
         self._current_allowed_slots: int = 1
         self._episode_load = max(0.0, float(episode_load))
         self._max_load = max(1.0, float(max_load))
@@ -223,7 +223,7 @@ class BASEEnv(Env):
         elif action_idx == self._null_action_index:
             null_action = True
             valid_action = True
-            # self._pending_reward = -1.0 #null action懲罰
+            # self._pending_reward = -1.0 #null action鎳茬桨
             # previous reward: self._pending_reward = 0.0
             self._pending_reward = self._reward_null
         else:
@@ -820,7 +820,7 @@ class BASEEnv(Env):
                 self._scheduled_allocations = remaining
 
     def attach_network(self, network_instance: Network) -> None:
-        #PPO_TRAIN中的网络实例与env的接口，offline loop now passes the instance upfront
+        #PPO_TRAIN涓殑缃戠粶瀹炰緥涓巈nv鐨勬帴鍙ｏ紝offline loop now passes the instance upfront
         self.network_instance = network_instance
 
     @property

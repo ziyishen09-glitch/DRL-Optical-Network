@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import random
 from collections import deque
@@ -45,7 +45,7 @@ def generate_request_queue(
 
 
 def sample_interarrival(load: float, rng: Optional[random.Random] = None) -> float:
-    """Sample Erlang-style interarrival times (λ = load / 10)."""
+    """Sample Erlang-style interarrival times (位 = load / 10)."""
     lam = float(load) / 10.0
     generator = rng or random
     interarrival = generator.expovariate(lam)
