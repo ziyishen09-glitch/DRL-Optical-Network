@@ -1,0 +1,9 @@
+argcomplete==1.12.1
+gymnasium==1.2.3
+matplotlib==3.10.8
+networkx==3.6.1
+numpy==2.4.2
+stable_baselines3==2.7.1
+sb3-contrib @ git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib.git
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.5.1+cu121

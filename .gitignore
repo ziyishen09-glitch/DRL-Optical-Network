@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+*.egg
+pip-wheel-metadata/
+
+# virtualenv
+.venv/
+venv_main/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# results / outputs
+results/
+*.log
+
+# build/dist
+build/
+dist/
+
+# other
+*.sqlite3

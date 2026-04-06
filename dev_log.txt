@@ -1,0 +1,14 @@
+1/18 ✔:
+Finished framework of BASE_env, the environment for the agent. Need to verify
+correctness of some functions calculating features in in. There is still a dummy
+implementation of PPO in BASE_PPO_TRAIN, need to be changed to actual working
+PPO implementation afterwards.
+
+TODO:
+Implement a PPO trainer and try the stuff out.
+
+optimization log:
+1. sb3 to onnx inference for faster inference (10% performance increase)
+2. .sbp calculation LUT (little performance increase)
+3. action masking optimization (per-slot deepcopy to per step) (50% performance increase)
+4. traffic matrix update optimization (replace python for using numpy matrix) (>100% improvement)
