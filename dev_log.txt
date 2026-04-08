@@ -5,7 +5,6 @@ implementation of PPO in BASE_PPO_TRAIN, need to be changed to actual working
 PPO implementation afterwards.
 
 TODO:
-<<<<<<< HEAD
 Implement a PPO trainer and try the stuff out.
 
 optimization log:
@@ -13,6 +12,3 @@ optimization log:
 2. .sbp calculation LUT (little performance increase)
 3. action masking optimization (per-slot deepcopy to per step) (50% performance increase)
 4. traffic matrix update optimization (replace python for using numpy matrix) (>100% improvement)
-=======
-Implement a PPO trainer and try the stuff out.
->>>>>>> 309a74d505d1aa87510b44c04f3ed4692b388b18

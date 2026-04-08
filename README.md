@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # DRL-based RWTA for Optical Networks
 
 This project is a realization for DRL based Routing, wavelength and timeslot assignment.
@@ -173,8 +172,3 @@ This corresponds to a major reduction in DRL evaluation latency while keeping DR
 
 - If lookup JSON path points to an existing directory by mistake, generation will fail by design.
 - For fair DRL-vs-heuristic comparison, keep topology/failure/load/calls settings aligned.
-=======
-# DRL-based RWA for QKD-secured optical network 
-
-This repository contains code for DRL-based RWA and link failure recovery in QKD-optical networks.
->>>>>>> 309a74d505d1aa87510b44c04f3ed4692b388b18
